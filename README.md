@@ -21,6 +21,7 @@ Also see [Decrypting TLS, HTTP/2 and QUIC with Wireshark](https://www.youtube.co
 - [Build curl](#build-curl)
 - [Nginx HTTP3 request (nginx)](#nginx-http3-request)
 - [Envoy request (envoy)](#envoy-http3-request)
+- [Dotnet request (dotnet)](#dotnet-http3-request)
 - [Decoding QUIC](#decoding-quic)
 
 ### Build nginx
@@ -212,6 +213,104 @@ The envoy logs will show the full capture
 [2021-12-27 09:55:29.719][674979][debug][http] [source/common/http/conn_manager_impl.cc:1517] [C5477787520329841858][S8968662946347409001] stream reset
 ```
 
+#### Dotnet HTTP3 request
+
+see [Use HTTP/3 with the ASP.NET Core Kestrel web server](https://docs.microsoft.com/en-us/aspnet/core/fundamentals/servers/kestrel/http3?view=aspnetcore-6.0)
+
+
+Build
+
+```bash
+docker build -t salrashid123/bash-http3 .
+```
+
+Run
+```
+docker run --net=host -p 8443:8443 -t salrashid123/bash-http3 dotnet run
+```
+
+call client
+
+```
+$ docker run --net=host -v`pwd`/config/:/certs -v /tmp/keylog/:/tmp/keylog -e SSLKEYLOGFILE=/tmp/keylog/sslkeylog.log     -t salrashid123/curl-http3    -vvvvvv --cacert certs/tls-ca-chain.pem     --resolve  localhost.esodemoapp2.com:8443:127.0.0.1 --http3 https://localhost.esodemoapp2.com:8443/
+* Added localhost.esodemoapp2.com:8443:127.0.0.1 to DNS cache
+* Hostname localhost.esodemoapp2.com was found in DNS cache
+*   Trying 127.0.0.1:8443...
+* Connect socket 6 over QUIC to 127.0.0.1:8443
+* Connected to localhost.esodemoapp2.com () port 8443 (#0)
+* Using HTTP/3 Stream ID: 0 (easy handle 0x55d43ace6f60)
+> GET / HTTP/3
+> Host: localhost.esodemoapp2.com:8443
+> user-agent: curl/7.81.0-DEV
+> accept: */*
+> 
+* ngh3_stream_recv returns 0 bytes and EAGAIN
+* ngh3_stream_recv returns 0 bytes and EAGAIN
+* ngh3_stream_recv returns 0 bytes and EAGAIN
+< HTTP/3 200 
+< content-type: text/plain; charset=utf-8
+< date: Mon, 27 Dec 2021 19:41:49 GMT
+< server: Kestrel
+< 
+* Connection #0 to host localhost.esodemoapp2.com left intact
+Hello World!
+```
+
+gives server output confirming http3
+
+```
+dbug: Microsoft.AspNetCore.Server.Kestrel.Transport.Quic[1]
+      Connection id "0HME9E39Q5RR3" accepted.
+dbug: Microsoft.AspNetCore.Server.Kestrel.Connections[39]
+      Connection id "0HME9E39Q5RR3" accepted.
+dbug: Microsoft.AspNetCore.Server.Kestrel.Connections[1]
+      Connection id "0HME9E39Q5RR3" started.
+dbug: Microsoft.AspNetCore.Server.Kestrel.Transport.Quic[3]
+      Stream id "0HME9E39Q5RR3:00000003" type Unidirectional connected.
+dbug: Microsoft.AspNetCore.Server.Kestrel.Transport.Quic[2]
+      Stream id "0HME9E39Q5RR3:00000002" type Unidirectional accepted.
+dbug: Microsoft.AspNetCore.Server.Kestrel.Transport.Quic[2]
+      Stream id "0HME9E39Q5RR3:00000006" type Unidirectional accepted.
+dbug: Microsoft.AspNetCore.Server.Kestrel.Transport.Quic[2]
+      Stream id "0HME9E39Q5RR3:0000000A" type Unidirectional accepted.
+dbug: Microsoft.AspNetCore.Server.Kestrel.Transport.Quic[2]
+      Stream id "0HME9E39Q5RR3:00000000" type Bidirectional accepted.
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/3 GET https://localhost.esodemoapp2.com:8443/ - -
+dbug: Microsoft.AspNetCore.Routing.Matching.DfaMatcher[1001]
+      1 candidate(s) found for the request path '/'
+dbug: Microsoft.AspNetCore.Routing.EndpointRoutingMiddleware[1]
+      Request matched endpoint 'HTTP: GET /'
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[0]
+      Executing endpoint 'HTTP: GET /'
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[1]
+      Executed endpoint 'HTTP: GET /'
+dbug: Microsoft.AspNetCore.Server.Kestrel.Transport.Quic[10]
+      Stream id "0HME9E39Q5RR3:00000000" shutting down writes because: "The QUIC transport's send loop completed gracefully.".
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/3 GET https://localhost.esodemoapp2.com:8443/ - - - 200 - text/plain;+charset=utf-8 6.7929ms
+dbug: Microsoft.AspNetCore.Server.Kestrel[25]
+      Connection id "0HME9E39Q5RR3", Request id "0HME9E39Q5RR3:00000000": started reading request body.
+dbug: Microsoft.AspNetCore.Server.Kestrel[26]
+      Connection id "0HME9E39Q5RR3", Request id "0HME9E39Q5RR3:00000000": done reading request body.
+dbug: Microsoft.AspNetCore.Server.Kestrel.BadRequests[28]
+      Connection id "0HME9E39Q5RR3", Request id "0HME9E39Q5RR3:00000000": the connection was closed because the response was not read by the client at the specified minimum data rate.
+dbug: Microsoft.AspNetCore.Server.Kestrel.Http3[53]
+      Connection id "0HME9E39Q5RR3": GOAWAY stream ID 4.
+dbug: Microsoft.AspNetCore.Server.Kestrel.Transport.Quic[6]
+      Connection id "0HME9E39Q5RR3" aborted by application with error code 258 because: "The connection was timed out by the server because the response was not read by the client at the specified minimum data rate.".
+dbug: Microsoft.AspNetCore.Server.Kestrel.Transport.Quic[10]
+      Stream id "0HME9E39Q5RR3:00000003" shutting down writes because: "Operation aborted.".
+dbug: Microsoft.AspNetCore.Server.Kestrel.BadRequests[20]
+      Connection id "0HME9E39Q5RR3" request processing ended abnormally.
+      Microsoft.AspNetCore.Connections.ConnectionAbortedException: The connection was timed out by the server because the response was not read by the client at the specified minimum data rate.
+         at Microsoft.AspNetCore.Server.Kestrel.Transport.Quic.Internal.QuicConnectionContext.AcceptAsync(CancellationToken cancellationToken)
+         at Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http3.Http3Connection.ProcessRequestsAsync[TContext](IHttpApplication`1 application)
+dbug: Microsoft.AspNetCore.Server.Kestrel.Http3[44]
+      Connection id "0HME9E39Q5RR3" is closed. The last processed stream ID was 0.
+dbug: Microsoft.AspNetCore.Server.Kestrel.Connections[2]
+      Connection id "0HME9E39Q5RR3" stopped.
+```
 
 ### Decoding QUIC
 
