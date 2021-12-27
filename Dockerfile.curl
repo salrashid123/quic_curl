@@ -1,0 +1,51 @@
+FROM debian:11
+
+RUN apt-get update && apt-get -y install gcc build-essential git cmake \
+   ninja-build libtool pkg-config check gengetopt help2man mercurial libpcre3 libpcre3-dev zlib1g zlib1g-dev  \
+   libunwind-dev wget curl zip
+
+ENV INSTALL_HOME=/apps/http3
+RUN mkdir -p $INSTALL_HOME/src
+WORKDIR /apps/http3 
+
+# install openssl+quic
+RUN cd $INSTALL_HOME/src && \
+   git clone --depth 1 -b openssl-3.0.0+quic https://github.com/quictls/openssl && \
+   cd $INSTALL_HOME/src/openssl && \
+   git checkout 62d4de00abfa82fc01efa2eba1982a86c4864f39 && \
+   ./config enable-tls1_3 --prefix=$INSTALL_HOME/openssl && \
+   make && make install
+ 
+### build nghttp3
+RUN cd $INSTALL_HOME/src && \
+   git clone https://github.com/ngtcp2/nghttp3 && \
+   cd $INSTALL_HOME/src/nghttp3 && \
+   git checkout 8d8184acf850b06b53157bba39022bc7b7b5f1cd && \
+   autoreconf -fi && \
+   ./configure --prefix=$INSTALL_HOME/nghttp3 --enable-lib-only && \
+   make && make install
+
+### build ngtcp2
+RUN cd $INSTALL_HOME/src && \
+   git clone https://github.com/ngtcp2/ngtcp2 && \
+   cd $INSTALL_HOME/src/ngtcp2 && \
+   git checkout 20c710a8789ec910455ae4e588c72e9e39f8cec9 && \
+   autoreconf -fi && \
+   ./configure PKG_CONFIG_PATH=$INSTALL_HOME/openssl/lib64/pkgconfig:$INSTALL_HOME/nghttp3/lib/pkgconfig LDFLAGS="-Wl,-rpath,$INSTALL_HOME/openssl/lib" \
+   --prefix=$INSTALL_HOME/ngtcp2 --enable-lib-only --with-libnghttp3  && \
+   make && make install
+
+### installcurl
+RUN cd $INSTALL_HOME/src && \
+  git clone https://github.com/curl/curl && \
+  cd $INSTALL_HOME/src/curl && \
+  git checkout 7a08bb709ccec173e154feaa66b9a6d7885c4672 && \
+  autoreconf -fi && \
+  export PKGCONFIG_PATH=/usr/local/lib/pkgconfig/:$INSTALL_HOME/ngtcp2/lib/pkgconfig:$INSTALL_HOME/openssl/lib64/pkgconfig:$INSTALL_HOME/nghttp3/lib/pkgconfig && \
+  LDFLAGS="-Wl,-rpath,$INSTALL_HOME/openssl/lib" ./configure --with-openssl=$INSTALL_HOME/openssl \
+   --with-nghttp3=$INSTALL_HOME/nghttp3 --with-ngtcp2=$INSTALL_HOME/ngtcp2 --prefix=$INSTALL_HOME/curl && \
+  make && make install
+
+ENV LD_LIBRARY_PATH=$INSTALL_HOME/curl/lib:$INSTALL_HOME/openssl/lib64:$LD_LIBRARY_PATH
+
+ENTRYPOINT ["/apps/http3/curl/bin/curl"]

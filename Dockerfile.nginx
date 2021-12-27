@@ -1,0 +1,43 @@
+FROM debian:11
+
+RUN apt-get update && apt-get -y install gcc build-essential git cmake \
+   ninja-build libtool pkg-config check gengetopt help2man mercurial libpcre3 libpcre3-dev zlib1g zlib1g-dev  \
+   libunwind-dev wget curl zip
+
+RUN wget -q https://go.dev/dl/go1.17.5.linux-amd64.tar.gz && \
+    rm -rf /usr/local/go && tar -C /usr/local -xzf go1.17.5.linux-amd64.tar.gz
+ENV PATH=$PATH:/usr/local/go/bin
+ENV INSTALL_HOME=/apps/http3
+RUN mkdir -p $INSTALL_HOME/src
+WORKDIR /apps/http3 
+
+# install boringssl
+
+### BoringSSL
+RUN cd $INSTALL_HOME/src && \
+    git clone https://boringssl.googlesource.com/boringssl && \
+    cd $INSTALL_HOME/src/boringssl && \
+    git checkout 9bcc12d540c3b844ba317f042c731d64142af725 && \
+    mkdir build && \
+    cd build && \
+    cmake -GNinja .. && \
+    ninja
+
+## nginx
+RUN mkdir -p $INSTALL_HOME/src/nginx && \
+    cd $INSTALL_HOME/src/nginx && \
+    hg clone -b quic -r 5c86189a1c1b https://hg.nginx.org/nginx-quic && \
+    cd $INSTALL_HOME/src/nginx/nginx-quic && \
+    ./auto/configure --with-debug --prefix=$INSTALL_HOME/nginx --with-http_v3_module --with-stream_quic_module      \
+                       --with-cc-opt="-I$INSTALL_HOME/src/boringssl/include"   \
+                       --with-ld-opt="-L$INSTALL_HOME/src/boringssl/build/ssl  \
+                                      -L$INSTALL_HOME/src/boringssl/build/crypto" && \ 
+    make && make install
+
+ADD config/nginx.conf $INSTALL_HOME/nginx/conf/nginx.conf
+RUN mkdir -p $INSTALL_HOME/nginx/conf/ssl
+ADD config/server.crt $INSTALL_HOME/nginx/conf/ssl
+ADD config/server.key $INSTALL_HOME/nginx/conf/ssl
+
+EXPOSE 8443
+ENTRYPOINT ["/apps/http3/nginx/sbin/nginx", "-c", "/apps/http3/nginx/conf/nginx.conf"] 
