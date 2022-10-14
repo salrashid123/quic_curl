@@ -48,7 +48,10 @@ docker build -t salrashid123/curl-http3 -f Dockerfile.curl .
 Now start the nginx container:
 
 ```bash
-docker run -v `pwd`/logs:/apps/http3/nginx/logs --net=host -p 8443:8443 -t salrashid123/nginx-http3
+docker run -v `pwd`/logs:/apps/http3/nginx/logs \
+    -v `pwd`/config/server.crt:/apps/http3/nginx/conf/ssl/server.crt \
+    -v `pwd`/config/server.key:/apps/http3/nginx/conf/ssl/server.key \
+    --net=host -p 8443:8443 -t salrashid123/nginx-http3
 ```
 
 Note, nginx access logs will be written in the appropriately named `logs/` folder
